@@ -16,6 +16,7 @@ declare global {
 
   interface ImportMetaEnv {
     readonly BASE_NAME: string;
+    readonly API_URL?: string;
   }
 }
 

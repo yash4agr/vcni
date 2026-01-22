@@ -3,6 +3,7 @@ import { BaseCrudService } from '@/integrations';
 import type { CommandHistory, ActionWidgets } from '@/entities';
 import { VoiceClient } from './VoiceClient';
 import { TTSService } from './TTSService';
+import { tokenManager } from './TokenManager';
 import { VoiceState, BackendNLUResponse, ConversationContext } from './types';
 
 // Constants
@@ -15,6 +16,23 @@ let voiceClient: VoiceClient | null = null;
 let bufferTimeout: NodeJS.Timeout | null = null;
 let inactivityTimeout: NodeJS.Timeout | null = null;
 let sessionTimeout: NodeJS.Timeout | null = null;
+
+// Intent to UI mode mapping for backend intents
+function mapIntentToUiMode(intent: string): string {
+  // Weather intents
+  if (intent === 'weather_query') return 'weather';
+
+  // Music intents
+  if (['play_music', 'play_radio', 'play_podcasts', 'play_audiobook'].includes(intent)) {
+    return 'music';
+  }
+
+  // IoT/Smart Home intents
+  if (intent.startsWith('iot_')) return 'smart_home';
+
+  // Default to AI response for everything else
+  return 'ai_response';
+}
 
 export const useVoiceStore = create<VoiceState>((set, get) => ({
   // --- Initial State ---
@@ -53,7 +71,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   // --- Listening Methods ---
   startListening: async () => {
     if (get().isListening) return;
-    
+
     // Clear old timeouts
     if (bufferTimeout) clearTimeout(bufferTimeout);
     if (inactivityTimeout) clearTimeout(inactivityTimeout);
@@ -63,12 +81,12 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       onConnected: () => {
         console.log('[Store] Connected');
         set({ isListening: true, currentTranscript: '' });
-        
+
         // Start Safety Timeouts
         sessionTimeout = setTimeout(() => get().stopListening(), SESSION_TIMEOUT);
         inactivityTimeout = setTimeout(() => get().stopListening(), INACTIVITY_TIMEOUT);
       },
-      
+
       onTranscript: (text, isFinal) => {
         // Reset Inactivity Timer
         if (inactivityTimeout) clearTimeout(inactivityTimeout);
@@ -84,12 +102,12 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
           }, TRANSCRIPT_BUFFER_DELAY);
         }
       },
-      
+
       onError: (err) => {
         console.error('[Store] Voice Error:', err);
         get().stopListening();
       },
-      
+
       onDisconnected: () => {
         console.log('[Store] Disconnected');
         set({ isListening: false });
@@ -97,30 +115,31 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     });
 
     try {
-      // Fetch Token
-      const res = await fetch('/api/assemblyai/token');
-      const data = await res.json();
+      // Get token from cache (pre-fetched on page load)
+      const token = await tokenManager.getToken();
 
-      // const data = { token: 'AQICAHhSP--gzqwd67dd_jPEAiXH4o-iox25DgpL8nRLgcJP4QGHJhhtIazEyB9K_B1Efl-ZAAAGRjCCBkIGCSqGSIb3DQEHBqCCBjMwggYvAgEAMIIGKAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAws_P8OMVXaYzZ0bCQCARCAggX51AQfGbDModpw_fJ1dOhzdYR4h2xswAqNX6uLWZ91GZB7QqkwNDEa_Y0FxQKHPJi0nnTLMALs-FVbA66mPlvU2xPZs3e2FBykrQAMgyImammiNhtLKxSjSFZIoOy6obdZ_6PFEavoh2viThpRcUm_0REBrR42TkLqU9KK8PyWHJ-KZWGDy1kXHXU-5qed-xsL_ICqDu3xtpXReqp0iDvKGUsmrsFmXtLSwCaQZD_XCoirXkkjS_NeOwXtAWtCUUkMJQrXvXtdB8eJYNmc6LKPyQQh9wCP_BhifDL9rYu6Javg_G2yGFDfqNSYhHKjVAjFYxF6KteNzYlo6KZDDSKsA2g0Ij8zHELfjga_xfLMZvoSSfTacDxZbl5fJ-x4Fw27B3SLV4KEkg54i5wJ8DPx80s0vZ6WTCHwor1QDoTYdRfNF1hpczCaacmUxkMy7KbHaQl7xcZdZ0LeePjBRyeVOEuOQr3d3psZ8t-_wOIpspbecYNY7CQcYvkgMUfKAxla3owE12wZGrNWz6Ango8X2JTlKjHGc2nS_jHtEQGwn2BEb7TCKo7JHZH16v6e94WgpkFOvYQWmGwtmSkkmRHJACSQRTzo6hiIJew8WDC0qtRx-NRUQZKsHl_-uXsqgKur0iYgECF-T4Jme91pGQ5Vg7CIpuKyAS99KG1mwU_IQbcI1KRTE7VCt_JHb0AFjR1BaHFblbshThWBvH5DKslUwq1t4xXHk3CmZ9ZIRbbEvIXT-WZHfE5CHSlbqyuCdtyiNhNHhs72drfknGLp3esbDiz0FuOg1QXub9uwTBXX1dB0nXP-GBizMBnGvzOAdjmDjfsnf5wj45bOYNrbDzoAZFY-L90DCJcYzoPS2ajxQRTTMQ6PPNogXjQsKG87keT-nyVj68BAHNkgeXllReNelVS_THMnm-QIzPx-UxcBmX5XQJ68yvzY4IoDo6EFE4m4fk6X2ACuuGTTYtvMZgSwr0Xp3FP0f89UMLynUZCzawwnmdzo-zbvlH43g6PFgGDyRqAGbVR-Xt9TMfogg293EilNJAuFILBI-3cfJLq4cZdbqAIqNUbvWZb4nf8wSCq3hKmY20yde0YU5rx5IVN7_CdRRdoLwBLGW2rlC7XUI1cnvRKtuitNf2Ey3Oq5Wz0oRBWmco1whNbXJXs3SBBZ1Ti9D6trZ2zk5XT1z2yLQi-gJhJnpQ8pEVLCghi9A2cTGUILN8vHLudVjBHl0gPM44OiDrmTYOWwj8WoZYynLe-BkpmsFusn0lJdjKDKPCPKFlNktU0_dS2t3pEfOclaLdZS11lP9pIbuWmTvl-bZnUkCQQ5nAhICqDChAUVpnWg-6Q7-XoIOk9yxMFhKEXWTO7zF92ho4kBmExvihf965p4Hfnx4JAbY7Qzw7l3quPoSyrl6WvqYD5gMfnScHePA6kOqV4ggYDFkITEpQnAwHxDULDryhOGyovF0h6reIN8Ykfl4PVywFoAjEwpkNuqu7G-Swb73u1Ideljrs7ICwpt-6916Cgjuyw8a4eSEcXpcS_KWKCdf0H7zweSt-ixGpm3Pl25ypPGiNfLzeoHfa2OZAmphFgV9HdDoMqsMlr5DIyFEahTLRChVX6tn9TcUiusBrbEMKNm8DDkdRAp4-xEZzwjrnsXdnXnGXnHri2tP7hCpG-1_HYF2XXclkMrbmyahbkukZHScqip1QsRVeBk3otdUZBWi-pkzwq1SzDV2T5vYHomGumRtzg7ZkM7kqWY0jbks6HTSKdUAfTvhfKVndlX_VBeX4MwDPgQ8G9jmn9echIQCngMO8OBkUXOaTd0Ccr-l3lbLsgJyqK84IhaUdWJaY1Q5odhsBmqYZZ_iJm7njAtnqGwslERhJE4ciixEkS1yw5036QLt3L1h8b-XFTJt6uKDRKs3RKkStt76_pmWGRTNa4UKdj4SAlS9jXduRd0Ht6lMaJC8BH1AQTkYI9pwJZr2_q4zkf5eD4Dxwe--Yn1ohBwvWr1T4m9aLPOKaA9OXmNxFZzX0F2v2CD81vKMAeoBdc' };
-      
       // Connect
-      await voiceClient.connect(data.token);
+      await voiceClient.connect(token);
     } catch (err) {
       console.error('[Store] Failed to start:', err);
+      // Invalidate cache on error so next attempt fetches fresh
+      tokenManager.invalidate();
       set({ isListening: false });
     }
   },
 
   stopListening: () => {
+
+    // Immediately set state to prevent race conditions
     voiceClient?.disconnect();
     voiceClient = null;
     
+    set({ isListening: false, currentTranscript: '' });
+
     // Cleanup Timeouts
     if (bufferTimeout) clearTimeout(bufferTimeout);
     if (inactivityTimeout) clearTimeout(inactivityTimeout);
     if (sessionTimeout) clearTimeout(sessionTimeout);
-    
-    set({ isListening: false });
   },
 
   // --- Command Processing ---
@@ -130,41 +149,98 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     if (!skipDuplicateCheck && trimmed === get().lastProcessedTranscript) return;
 
     set({ lastProcessedTranscript: trimmed });
-    
-    // Mock NLU / Backend Call (Move actual fetch here if preferred)
-    // For now, keeping your structure
-    try {
-       const response = await fetch('/api/nlu/process', {
-         method: 'POST',
-         body: JSON.stringify({ text: trimmed, context: get().conversationContext })
-       });
-       const nluResult: BackendNLUResponse = await response.json();
 
-      // const nluResult: BackendNLUResponse = {
-      //   intent: 'test',
-      //   response: 'Hello Yash, this is a test response',
-      //   confidence: 1,
-      //   slots: {},
-      //   action: 'test',
-      // };
-       set({ detectedIntent: nluResult.intent, lastNLUResult: nluResult });
-       
-       if (nluResult.response) get().speak(nluResult.response);
-       
-       // Update History
-       const entry = {
-         _id: crypto.randomUUID(),
-         commandText: trimmed,
-         detectedIntent: nluResult.intent,
-         processedAt: new Date(),
-         status: 'completed',
-         actionResult: nluResult.response
-       } as CommandHistory;
-       
-       set(s => ({ commandHistory: [entry, ...s.commandHistory] }));
-       
+    // Auto-stop mic while processing
+    const wasListening = get().isListening;
+    if (wasListening) {
+      get().stopListening();
+    }
+
+    try {
+      const startTime = performance.now();
+
+      const response = await fetch('/api/nlu/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: trimmed,
+          context: get().conversationContext,
+          user_id: 'default_user' // TODO: Use actual user ID
+        })
+      });
+      const nluResult: BackendNLUResponse = await response.json();
+
+      const endTime = performance.now();
+      const responseTimeMs = endTime - startTime;
+      const responseTimeSec = (responseTimeMs / 1000).toFixed(2);
+
+      console.log(`[Store] Response time: ${responseTimeSec}s`);
+
+      // Use ui_mode for widget switching, fallback to intent-based mapping
+      const uiMode = nluResult.ui_mode || mapIntentToUiMode(nluResult.intent);
+
+      set({
+        detectedIntent: uiMode,
+        lastNLUResult: nluResult,
+        conversationContext: {
+          lastIntent: nluResult.intent,
+          lastSlots: nluResult.slots || {},
+          lastCommand: trimmed,
+          awaitingFollowup: nluResult.needs_more_info || false,
+          followupContext: nluResult.follow_up_question,
+        }
+      });
+
+      // Update Widgets if data provided
+      if (uiMode && nluResult.ui_data) {
+        const newWidget: ActionWidgets = {
+          _id: Date.now().toString(),
+          widgetType: uiMode,
+          displayName: nluResult.intent || 'Unknown Action',
+          description: nluResult.response,
+          isActive: true,
+          configurationJson: JSON.stringify({
+            ...nluResult.ui_data,
+            responseTime: responseTimeSec  // Add actual response time
+          }),
+          visualAsset: nluResult.ui_data.visualAsset
+        };
+
+        set(s => ({
+          // Add new widget and remove old ones of same type to keep list clean
+          actionWidgets: [newWidget, ...s.actionWidgets.filter(w => w.widgetType !== uiMode)]
+        }));
+      }
+
+      if (nluResult.response) get().speak(nluResult.response);
+
+      // Update History
+      const entry = {
+        _id: crypto.randomUUID(),
+        commandText: trimmed,
+        detectedIntent: nluResult.intent,
+        processedAt: new Date(),
+        status: nluResult.state || 'completed',
+        actionResult: nluResult.response
+      } as CommandHistory;
+
+      set(s => ({ commandHistory: [entry, ...s.commandHistory] }));
+
+      // Auto-restart mic after processing
+      setTimeout(() => {
+        if (!get().isListening) {
+          get().startListening();
+        }
+      }, 500);
+
     } catch (err) {
-       console.error('[Store] NLU Error:', err);
+      console.error('[Store] NLU Error:', err);
+      // Restart mic on error too
+      setTimeout(() => {
+        if (!get().isListening) {
+          get().startListening();
+        }
+      }, 500);
     }
   },
 
