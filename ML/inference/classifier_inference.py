@@ -99,7 +99,8 @@ vol = modal.Volume.from_name("ai-assistant")
     cpu=2.0,           # 2 CPU Cores
     memory=2048,       # 2 GB RAM
     max_containers=5, # limit 5 concurrent containers
-    scaledown_window=300 # shuts down after 300s of no use
+    scaledown_window=900, # shuts down after 15 min of no use
+    enable_memory_snapshot=True
 )
 @modal.concurrent(max_inputs=20)
 class ModelService:
