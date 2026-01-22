@@ -1,0 +1,58 @@
+# VCNI - Voice Controlled Natural Interface
+# Docker Compose for local development and production
+
+services:
+  # Backend API Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vcni-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - ASSEMBLYAI_API_KEY=${ASSEMBLYAI_API_KEY}
+      - MODAL_CLASSIFIER_URL=${MODAL_CLASSIFIER_URL:-https://yash4agr--joint-nlu-service-web-inference.modal.run}
+      - CLASSIFIER_TIMEOUT=${CLASSIFIER_TIMEOUT:-10}
+      - CONFIDENCE_THRESHOLD=${CONFIDENCE_THRESHOLD:-0.7}
+      - WEATHERAPI_KEY=${WEATHERAPI_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - RIME_API_KEY=${RIME_API_KEY}
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - vcni-network
+
+  # Frontend Web Service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - WIX_CLIENT_ID=${WIX_CLIENT_ID}
+        - WIX_CLIENT_INSTANCE_ID=${WIX_CLIENT_INSTANCE_ID:-local-dev}
+        - WIX_CLIENT_PUBLIC_KEY=${WIX_CLIENT_PUBLIC_KEY:-local-dev}
+        - WIX_CLIENT_SECRET=${WIX_CLIENT_SECRET:-local-dev}
+    container_name: vcni-frontend
+    ports:
+      - "3000:4321"
+    environment:
+      - NODE_ENV=production
+      - API_URL=http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - vcni-network
+
+networks:
+  vcni-network:
+    driver: bridge
