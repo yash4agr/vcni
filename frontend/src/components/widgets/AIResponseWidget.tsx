@@ -10,7 +10,7 @@ interface AIResponseWidgetProps {
 
 export default function AIResponseWidget({ data }: AIResponseWidgetProps) {
   const config = data?.configurationJson ? JSON.parse(data.configurationJson) : null;
-  
+
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(true);
 
@@ -103,8 +103,8 @@ export default function AIResponseWidget({ data }: AIResponseWidgetProps) {
           {/* Visual Asset */}
           {data?.visualAsset && (
             <div className="mb-6">
-              <Image 
-                src={data.visualAsset} 
+              <Image
+                src={data.visualAsset}
                 alt="AI visualization"
                 className="w-full h-32 object-cover rounded-xl opacity-40"
                 width={600}
@@ -138,7 +138,7 @@ export default function AIResponseWidget({ data }: AIResponseWidgetProps) {
                   className="flex items-center gap-2 text-xs text-foreground/50 mt-4 pt-4 border-t border-white/10"
                 >
                   <Sparkles className="w-4 h-4" />
-                  <span>Response generated in 0.3s</span>
+                  <span>Response generated in {config?.responseTime || '0.0'}s</span>
                 </motion.div>
               )}
             </div>
@@ -171,16 +171,7 @@ export default function AIResponseWidget({ data }: AIResponseWidgetProps) {
         </div>
       </motion.div>
 
-      {data?.description && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="text-sm text-foreground/60 italic"
-        >
-          {data.description}
-        </motion.div>
-      )}
+
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {

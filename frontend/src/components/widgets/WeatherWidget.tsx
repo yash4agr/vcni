@@ -10,18 +10,18 @@ interface WeatherWidgetProps {
 export default function WeatherWidget({ data }: WeatherWidgetProps) {
   // Parse configuration if available
   const config = data?.configurationJson ? JSON.parse(data.configurationJson) : null;
-  
+
   const weatherData = config || {
-    temperature: 72,
+    temperature: 20,
     condition: 'Partly Cloudy',
     humidity: 65,
-    windSpeed: 12,
+    windSpeed: 15,
     visibility: 10,
+    location: 'Current Location',
     forecast: [
-      { day: 'Mon', high: 75, low: 62, icon: 'sun' },
-      { day: 'Tue', high: 73, low: 60, icon: 'cloud' },
-      { day: 'Wed', high: 68, low: 58, icon: 'rain' },
-      { day: 'Thu', high: 70, low: 59, icon: 'cloud' },
+      { day: 'Mon', high: 24, low: 18, icon: 'sun' },
+      { day: 'Tue', high: 22, low: 17, icon: 'cloud' },
+      { day: 'Wed', high: 19, low: 15, icon: 'rain' },
     ]
   };
 
@@ -46,23 +46,23 @@ export default function WeatherWidget({ data }: WeatherWidgetProps) {
       >
         {/* Background Glow Effect */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-electric-teal/5 rounded-full blur-3xl" />
-        
+
         <div className="relative z-10 flex items-center justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-4 mb-4">
               <Cloud className="w-16 h-16 text-electric-teal" />
               <div>
                 <h3 className="text-5xl font-heading font-bold text-foreground">
-                  {weatherData.temperature}°F
+                  {weatherData.temperature}°C
                 </h3>
                 <p className="text-lg text-foreground/70 mt-1">{weatherData.condition}</p>
               </div>
             </div>
-            
+
             {data?.visualAsset && (
               <div className="mt-6">
-                <Image 
-                  src={data.visualAsset} 
+                <Image
+                  src={data.visualAsset}
                   alt="Weather visualization"
                   className="w-full h-32 object-cover rounded-xl opacity-60"
                   width={400}
@@ -80,20 +80,20 @@ export default function WeatherWidget({ data }: WeatherWidgetProps) {
                 <p className="text-lg font-semibold text-foreground">{weatherData.humidity}%</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3 bg-glassmorphism-overlay backdrop-blur-sm rounded-xl p-4 border border-white/10">
               <Wind className="w-6 h-6 text-electric-teal" />
               <div>
                 <p className="text-xs text-foreground/60">Wind Speed</p>
-                <p className="text-lg font-semibold text-foreground">{weatherData.windSpeed} mph</p>
+                <p className="text-lg font-semibold text-foreground">{weatherData.windSpeed} km/h</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3 bg-glassmorphism-overlay backdrop-blur-sm rounded-xl p-4 border border-white/10">
               <Eye className="w-6 h-6 text-electric-teal" />
               <div>
                 <p className="text-xs text-foreground/60">Visibility</p>
-                <p className="text-lg font-semibold text-foreground">{weatherData.visibility} mi</p>
+                <p className="text-lg font-semibold text-foreground">{weatherData.visibility} km</p>
               </div>
             </div>
           </div>
@@ -108,9 +108,9 @@ export default function WeatherWidget({ data }: WeatherWidgetProps) {
           transition={{ delay: 0.1 }}
         >
           <h4 className="text-sm font-heading font-semibold text-foreground/70 uppercase tracking-wider mb-4">
-            5-Day Forecast
+            3-Day Forecast
           </h4>
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             {weatherData.forecast.map((day: any, index: number) => (
               <motion.div
                 key={day.day}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Lightbulb, Thermometer, Lock, Camera, Power } from 'lucide-react';
 import { Image } from '@/components/ui/image';
@@ -8,18 +8,35 @@ interface SmartHomeWidgetProps {
   data?: ActionWidgets;
 }
 
+interface Device {
+  id: number;
+  name: string;
+  type: string;
+  status: boolean;
+  value: number;
+}
+
+const defaultDevices: Device[] = [
+  { id: 1, name: 'Living Room Lights', type: 'light', status: true, value: 80 },
+  { id: 2, name: 'Thermostat', type: 'thermostat', status: true, value: 72 },
+  { id: 3, name: 'Front Door Lock', type: 'lock', status: false, value: 0 },
+  { id: 4, name: 'Security Camera', type: 'camera', status: true, value: 0 },
+];
+
 export default function SmartHomeWidget({ data }: SmartHomeWidgetProps) {
   const config = data?.configurationJson ? JSON.parse(data.configurationJson) : null;
-  
-  const [devices, setDevices] = useState(config?.devices || [
-    { id: 1, name: 'Living Room Lights', type: 'light', status: true, value: 80 },
-    { id: 2, name: 'Thermostat', type: 'thermostat', status: true, value: 72 },
-    { id: 3, name: 'Front Door Lock', type: 'lock', status: false, value: 0 },
-    { id: 4, name: 'Security Camera', type: 'camera', status: true, value: 0 },
-  ]);
+
+  const [devices, setDevices] = useState<Device[]>(config?.devices || defaultDevices);
+
+  // Sync devices state when backend config changes
+  useEffect(() => {
+    if (config?.devices) {
+      setDevices(config.devices);
+    }
+  }, [data?.configurationJson]);
 
   const toggleDevice = (id: number) => {
-    setDevices(devices.map(device => 
+    setDevices(devices.map(device =>
       device.id === id ? { ...device, status: !device.status } : device
     ));
   };
@@ -49,8 +66,8 @@ export default function SmartHomeWidget({ data }: SmartHomeWidgetProps) {
           animate={{ opacity: 1, y: 0 }}
           className="relative rounded-2xl overflow-hidden"
         >
-          <Image 
-            src={data.visualAsset} 
+          <Image
+            src={data.visualAsset}
             alt="Smart home visualization"
             className="w-full h-48 object-cover"
             width={800}
@@ -72,11 +89,10 @@ export default function SmartHomeWidget({ data }: SmartHomeWidgetProps) {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: index * 0.1 }}
-            className={`bg-deep-space-blue/40 rounded-2xl p-6 border transition-all duration-300 cursor-pointer ${
-              device.status 
-                ? 'border-electric-teal/40 shadow-[0_0_20px_rgba(0,255,255,0.1)]' 
+            className={`bg-deep-space-blue/40 rounded-2xl p-6 border transition-all duration-300 cursor-pointer ${device.status
+                ? 'border-electric-teal/40 shadow-[0_0_20px_rgba(0,255,255,0.1)]'
                 : 'border-white/10 hover:border-white/20'
-            }`}
+              }`}
             onClick={() => toggleDevice(device.id)}
           >
             <div className="flex items-start justify-between mb-4">
@@ -84,13 +100,13 @@ export default function SmartHomeWidget({ data }: SmartHomeWidgetProps) {
                 {getDeviceIcon(device.type, device.status)}
               </div>
               <motion.div
-                animate={{ 
+                animate={{
                   backgroundColor: device.status ? '#00FFFF' : 'rgba(255,255,255,0.1)',
                 }}
                 className="w-12 h-6 rounded-full relative cursor-pointer"
               >
                 <motion.div
-                  animate={{ 
+                  animate={{
                     x: device.status ? 24 : 0,
                     backgroundColor: device.status ? '#0A0A0A' : '#666',
                   }}
@@ -104,9 +120,8 @@ export default function SmartHomeWidget({ data }: SmartHomeWidgetProps) {
             </h4>
 
             <div className="flex items-center justify-between">
-              <span className={`text-sm font-semibold uppercase ${
-                device.status ? 'text-electric-teal' : 'text-foreground/40'
-              }`}>
+              <span className={`text-sm font-semibold uppercase ${device.status ? 'text-electric-teal' : 'text-foreground/40'
+                }`}>
                 {device.status ? 'Active' : 'Inactive'}
               </span>
               {device.type === 'light' && device.status && (
